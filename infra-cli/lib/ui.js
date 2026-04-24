@@ -29,12 +29,12 @@ export const log = {
 };
 
 // ─── BANNER ───────────────────────────────────────────────
-const GRADIENT_COLORS = ['#00f0ff', '#00ff9d', '#a78bfa', '#00f0ff'];
+const GRADIENT_COLORS = ['#6C63FF', '#00D4FF', '#6C63FF'];
 
 export function printBanner(subtitle = '') {
   console.clear();
 
-  const ascii = figlet.textSync('INFRA  CLI', { font: 'ANSI Shadow' });
+  const ascii = figlet.textSync('ORBIT', { font: 'ANSI Shadow' });
   const coloredArt = gradient(GRADIENT_COLORS).multiline(ascii);
 
   const hostname = os.hostname();
@@ -43,7 +43,7 @@ export function printBanner(subtitle = '') {
   const body =
     coloredArt +
     '\n\n' +
-    chalk.gray('        Infraestructura de Desarrollo · Docker · DevTools') +
+    chalk.gray('        Dev Infrastructure CLI  ·  Docker  ·  DevTools') +
     (subtitle
       ? '\n        ' + chalk.yellow('❯ ') + chalk.white(subtitle)
       : '');
@@ -53,7 +53,7 @@ export function printBanner(subtitle = '') {
     margin:           { top: 1, left: 2 },
     borderStyle:      'round',
     borderColor:      'cyan',
-    title:            gradient(GRADIENT_COLORS)(` ✦  Infra CLI  v1.0.0  ·  ${hostname}  ·  up ${uptime}  ✦ `),
+    title:            gradient(GRADIENT_COLORS)(` 🪐  ORBIT  v1.0.0  ·  ${hostname}  ·  up ${uptime}  `),
     titleAlignment:   'center',
   });
 

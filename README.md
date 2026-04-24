@@ -1,8 +1,27 @@
-# Dev Infrastructure
+<p align="center">
+  <img src="assets/orbit-banner.png" alt="ORBIT — Dev Infrastructure CLI" width="800"/>
+</p>
 
-> Infraestructura de desarrollo local basada en Docker: bases de datos, colas de mensajes, motores de búsqueda, monitoreo y herramientas de desarrollo — todo gestionado desde un único comando CLI interactivo.
+<p align="center">
+  <img src="assets/orbit-icon.png" alt="ORBIT icon" width="80"/>
+  &nbsp;&nbsp;
+  <strong>ORBIT</strong> &nbsp;·&nbsp; Dev Infrastructure CLI
+</p>
+
+<p align="center">
+  Manage your entire development infrastructure — Docker services, databases, queues,<br/>
+  search engines, monitoring and dev tools — from a single interactive command.
+</p>
+
+<p align="center">
+  <img src="https://img.shields.io/badge/command-orbit-6C63FF?style=for-the-badge&logo=terminal&logoColor=white" alt="command: orbit"/>
+  <img src="https://img.shields.io/badge/Node.js-18%2B-00D4FF?style=for-the-badge&logo=node.js&logoColor=white" alt="Node 18+"/>
+  <img src="https://img.shields.io/badge/Docker-24%2B-2496ED?style=for-the-badge&logo=docker&logoColor=white" alt="Docker 24+"/>
+  <img src="https://img.shields.io/badge/platform-macOS%20%7C%20Linux%20%7C%20Windows-555?style=for-the-badge" alt="platforms"/>
+</p>
 
 ---
+
 
 ## 📋 Tabla de Contenidos
 
@@ -98,12 +117,12 @@ Si todo está correcto, verás el banner de **INFRA CLI** con el menú principal
 
 ---
 
-## 🛠️ Herramienta CLI (`infra`)
+## 🛠️ Herramienta CLI (`orbit`)
 
 La herramienta central del proyecto. Se ejecuta desde cualquier directorio de tu terminal.
 
 ```bash
-infra
+orbit
 ```
 
 ### Funcionalidades

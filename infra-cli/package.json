@@ -1,7 +1,7 @@
 {
-  "name": "infra-cli",
+  "name": "orbit-cli",
   "version": "1.0.0",
-  "description": "",
+  "description": "ORBIT — Dev Infrastructure CLI. Manage Docker services, debug tools and system health from one command.",
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
@@ -11,7 +11,8 @@
   "license": "ISC",
   "type": "module",
   "bin": {
-    "infra": "./index.js"
+    "infra": "./index.js",
+    "orbit": "./index.js"
   },
   "dependencies": {
     "@clack/prompts": "^1.2.0",
