@@ -14,8 +14,12 @@
     "infra": "./index.js"
   },
   "dependencies": {
+    "@clack/prompts": "^1.2.0",
+    "boxen": "^8.0.1",
     "chalk": "^5.6.2",
     "cli-table3": "^0.6.5",
+    "figlet": "^1.11.0",
+    "gradient-string": "^3.0.0",
     "inquirer": "^9.3.8",
     "open": "^11.0.0",
     "os-utils": "^0.0.14",

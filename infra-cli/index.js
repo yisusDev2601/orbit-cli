@@ -1,6 +1,5 @@
 #!/usr/bin/env node
 
-import inquirer from 'inquirer';
 import chalk from 'chalk';
 import { execSync } from 'child_process';
 import fs from 'fs';
@@ -8,14 +7,35 @@ import path from 'path';
 import yaml from 'yaml';
 import open from 'open';
 import os from 'os';
+import figlet from 'figlet';
+import boxen from 'boxen';
+import gradient from 'gradient-string';
+import * as clack from '@clack/prompts';
+
+process.stdin.setMaxListeners(0);
 
 const FALLBACK_DIR = '/Users/jesusruizlopez/Documents/DESARROLLO/UPLAPH/DGM/PROYECTOS/dbs';
 
+// ─────────────────────────────────────────────
+//  Logger con badges estilo badge ([ INFO ] etc)
+// ─────────────────────────────────────────────
+const log = {
+  info:  (msg) => console.log(`${chalk.bgBlueBright.bold.black(' INFO  ')} ${chalk.blueBright(msg)}`),
+  ready: (msg) => console.log(`${chalk.bgGreenBright.bold.black(' READY ')} ${chalk.greenBright(msg)}`),
+  warn:  (msg) => console.log(`${chalk.bgYellow.bold.black(' WARN  ')} ${chalk.yellow(msg)}`),
+  error: (msg) => console.log(`${chalk.bgRed.bold.white(' ERROR ')} ${chalk.red(msg)}`),
+  dim:   (msg) => console.log(chalk.gray(msg)),
+  raw:   (msg) => console.log(msg),
+};
+
+// ─────────────────────────────────────────────
+//  Helpers de Docker Compose
+// ─────────────────────────────────────────────
 function getComposeDir() {
-  const currentDir = process.cwd();
-  if (fs.existsSync(path.join(currentDir, 'docker-compose.yml'))) return currentDir;
+  const cwd = process.cwd();
+  if (fs.existsSync(path.join(cwd, 'docker-compose.yml'))) return cwd;
   if (fs.existsSync(path.join(FALLBACK_DIR, 'docker-compose.yml'))) return FALLBACK_DIR;
-  console.log(chalk.red('❌ No se encontró docker-compose.yml ni en el directorio actual ni en la ruta por defecto.'));
+  log.error('No se encontró docker-compose.yml.');
   process.exit(1);
 }
 
@@ -25,477 +45,589 @@ const composeFile = path.join(composeDir, 'docker-compose.yml');
 function runCmd(cmd, silent = false) {
   try {
     return execSync(cmd, { cwd: composeDir, encoding: 'utf-8', stdio: silent ? 'pipe' : 'inherit' });
-  } catch (error) {
-    if (!silent) console.error(chalk.red(`Error ejecutando comando: ${cmd}`));
+  } catch {
+    if (!silent) log.error(`Error ejecutando: ${cmd}`);
     return null;
   }
 }
 
 function getServices() {
   try {
-    const file = fs.readFileSync(composeFile, 'utf8');
-    const parsed = yaml.parse(file);
-    return Object.keys(parsed.services || {});
-  } catch (e) {
-    console.log(chalk.red('❌ Error leyendo docker-compose.yml'));
+    return Object.keys(yaml.parse(fs.readFileSync(composeFile, 'utf8')).services || {});
+  } catch {
     return [];
   }
 }
 
 function getParsedCompose() {
-  const file = fs.readFileSync(composeFile, 'utf8');
-  return yaml.parse(file);
+  return yaml.parse(fs.readFileSync(composeFile, 'utf8'));
 }
 
 function saveCompose(parsed) {
   fs.writeFileSync(composeFile, yaml.stringify(parsed));
 }
 
-// ============== MENÚ PRINCIPAL ==============
+// ─────────────────────────────────────────────
+//  Función de cancel/salida segura
+// ─────────────────────────────────────────────
+function handleCancel(value) {
+  if (clack.isCancel(value)) {
+    clack.cancel(chalk.yellow('Operación cancelada.'));
+    return true;
+  }
+  return false;
+}
+
+// ─────────────────────────────────────────────
+//  Header / Banner
+// ─────────────────────────────────────────────
+function printBanner(subtitle = '') {
+  console.clear();
+
+  const ascii = figlet.textSync('INFRA  CLI', { font: 'ANSI Shadow' });
+  const gradientArt = gradient(['#00f0ff', '#00ff9d', '#00f0ff']).multiline(ascii);
+
+  const header = boxen(
+    gradientArt + '\n\n' +
+    chalk.gray('        Centro de comando · Infraestructura · Desarrollo') +
+    (subtitle ? '\n' + chalk.yellow(`        ${subtitle}`) : ''),
+    {
+      padding: { top: 1, bottom: 1, left: 4, right: 4 },
+      margin: { top: 1, left: 2 },
+      borderStyle: 'round',
+      borderColor: 'cyan',
+      title: gradient(['#00f0ff','#00ff9d'])(' ✦ Infra CLI v1.0.0 ✦ '),
+      titleAlignment: 'center',
+    }
+  );
+
+  console.log(header);
+
+  // Barra de info inferior
+  const info = `${chalk.gray('Directorio:')} ${chalk.cyan(composeDir)}   ${chalk.gray('Host:')} ${chalk.yellow(os.hostname())}`;
+  console.log(chalk.gray('  ' + info));
+  console.log('');
+}
+
+// ─────────────────────────────────────────────
+//  MENÚ PRINCIPAL
+// ─────────────────────────────────────────────
 async function showMainMenu() {
-  console.clear();
-  console.log(chalk.cyan.bold('\n🚀 Infraestructura & Asistente Dev (CLI)'));
-  console.log(chalk.gray(`Directorio: ${composeDir}\n`));
-  
-  const { action } = await inquirer.prompt([{
-    type: 'list',
-    name: 'action',
-    message: 'Menú Principal:',
-    choices: [
-      { name: '🐳 [1] Docker Infra (Bases de datos, Colas, Búsqueda)', value: 'docker' },
-      { name: '🛠️  [2] Dev Tools (Port Killer, Doctor, Local IP, Cheat Sheet)', value: 'devtools' },
-      { name: '📈 [3] System Health (RAM, CPU, Espacio Docker)', value: 'health' },
-      new inquirer.Separator(),
-      { name: '🚪 Salir', value: 'exit' }
-    ]
-  }]);
+  printBanner();
+  clack.intro(chalk.cyanBright('Menú Principal'));
 
-  switch (action) {
-    case 'docker': await dockerMenu(); break;
-    case 'devtools': await devToolsMenu(); break;
-    case 'health': await systemHealthMenu(); break;
-    case 'exit': 
-      console.log(chalk.green('¡Feliz programación! 👋\n'));
-      process.exit(0);
+  const action = await clack.select({
+    message: 'Selecciona una categoría:',
+    options: [
+      { value: 'docker',   label: '🐳  Docker Infra',   hint: 'Bases de datos, Colas, Búsqueda' },
+      { value: 'devtools', label: '🛠️   Dev Tools',       hint: 'Port Killer, Doctor, Cheat Sheet' },
+      { value: 'health',   label: '📈  System Health',   hint: 'RAM, CPU, Espacio Docker' },
+      { value: 'exit',     label: '🚪  Salir',           hint: 'Ctrl+C en cualquier momento' },
+    ],
+  });
+
+  if (handleCancel(action) || action === 'exit') {
+    clack.outro(chalk.greenBright('¡Feliz programación! 👋'));
+    process.exit(0);
   }
+
+  if (action === 'docker')   return dockerMenu();
+  if (action === 'devtools') return devToolsMenu();
+  if (action === 'health')   return systemHealthMenu();
 }
 
-// ============== DOCKER INFRA ==============
+// ─────────────────────────────────────────────
+//  DOCKER MENU
+// ─────────────────────────────────────────────
 async function dockerMenu() {
-  console.clear();
-  console.log(chalk.blue.bold('\n🐳 Gestión de Infraestructura Docker\n'));
+  printBanner('Docker Infra');
+  clack.intro(chalk.blue('🐳 Gestión de Infraestructura Docker'));
 
-  const { action } = await inquirer.prompt([{
-    type: 'list',
-    name: 'action',
-    message: 'Selecciona una acción:',
-    choices: [
-      { name: '📊 Ver estado general (Status)', value: 'status' },
-      { name: '🚀 Iniciar servicios (Selección múltiple)', value: 'up_multiple' },
-      { name: '🛑 Detener todos los servicios', value: 'down_all' },
-      { name: '⚙️  Gestionar un servicio específico (Logs, Reset, Credenciales)', value: 'manage_service' },
-      { name: '🔄 Gestionar Auto-Inicio (Mac Boot)', value: 'auto_start' },
-      { name: '🔗 Cómo conectar mis apps (Next/Nest) a la red', value: 'integration' },
-      new inquirer.Separator(),
-      { name: '⬅️  Volver al menú principal', value: 'back' }
-    ]
-  }]);
+  const action = await clack.select({
+    message: '¿Qué deseas hacer?',
+    options: [
+      { value: 'status',         label: '📊  Ver estado general',          hint: 'docker compose ps' },
+      { value: 'up_multiple',    label: '🚀  Iniciar servicios',           hint: 'Selección múltiple con checkboxes' },
+      { value: 'down_all',       label: '🛑  Detener TODOS los servicios', hint: 'docker compose down' },
+      { value: 'manage_service', label: '⚙️   Gestionar servicio específico', hint: 'Logs, Stats, Reset, Credenciales' },
+      { value: 'auto_start',     label: '🔄  Gestionar Auto-Inicio',       hint: 'Qué arranca al encender la Mac' },
+      { value: 'integration',    label: '🔗  Cómo conectar mis apps',      hint: 'Guía Next.js / NestJS' },
+      { value: 'back',           label: '⬅️   Volver',                      hint: '' },
+    ],
+  });
 
-  switch (action) {
-    case 'status':
-      console.log(chalk.blue.bold('\n📊 Estado de los Contenedores:\n'));
-      runCmd('docker compose ps');
-      await pause();
-      return dockerMenu();
-    case 'up_multiple':
-      await startMultipleServices();
-      return dockerMenu();
-    case 'down_all':
-      runCmd('docker compose down');
-      await pause();
-      return dockerMenu();
-    case 'manage_service':
-      await manageServiceMenu();
-      return dockerMenu();
-    case 'auto_start':
-      await autoStartMenu();
-      return dockerMenu();
-    case 'integration':
-      showIntegrationGuide();
-      return dockerMenu();
-    case 'back':
-      return showMainMenu();
+  if (handleCancel(action) || action === 'back') return showMainMenu();
+
+  if (action === 'status') {
+    log.info('Estado de los Contenedores:');
+    console.log('');
+    runCmd('docker compose ps');
+    console.log('');
+    await clack.note('Presiona Enter para continuar', 'Status');
+    await clack.text({ message: '' }).catch(() => {});
+    return dockerMenu();
   }
-}
 
-async function startMultipleServices() {
-  const services = getServices();
-  const { selected } = await inquirer.prompt([{
-    type: 'checkbox',
-    name: 'selected',
-    message: 'Selecciona los servicios que deseas iniciar (Usa barra espaciadora para marcar):',
-    choices: services
-  }]);
-
-  if (selected && selected.length > 0) {
-    console.log(chalk.blue(`\nIniciando: ${selected.join(', ')}...`));
-    runCmd(`docker compose up -d ${selected.join(' ')}`);
-  } else {
-    console.log(chalk.yellow('\nNo seleccionaste ningún servicio.'));
+  if (action === 'up_multiple') {
+    await startMultipleServices();
+    return dockerMenu();
   }
-  await pause();
-}
 
-async function manageServiceMenu() {
-  const services = getServices();
-  if (services.length === 0) {
-    console.log(chalk.yellow('No se encontraron servicios.'));
+  if (action === 'down_all') {
+    const spin = clack.spinner();
+    spin.start('Deteniendo todos los servicios...');
+    runCmd('docker compose down', true);
+    spin.stop(chalk.greenBright('Todos los servicios detenidos.'));
     await pause();
     return dockerMenu();
   }
 
-  const { service } = await inquirer.prompt([{
-    type: 'list',
-    name: 'service',
-    message: 'Selecciona un servicio para gestionar:',
-    choices: [...services, new inquirer.Separator(), { name: '⬅️  Volver', value: 'back' }]
-  }]);
+  if (action === 'manage_service') {
+    await manageServiceMenu();
+    return dockerMenu();
+  }
 
-  if (service === 'back') return dockerMenu();
+  if (action === 'auto_start') {
+    await autoStartMenu();
+    return dockerMenu();
+  }
+
+  if (action === 'integration') {
+    showIntegrationGuide();
+    await pause();
+    return dockerMenu();
+  }
+}
+
+// ─────────────────────────────────────────────
+//  Iniciar múltiples servicios
+// ─────────────────────────────────────────────
+async function startMultipleServices() {
+  const services = getServices();
+
+  const selected = await clack.multiselect({
+    message: 'Selecciona los servicios a iniciar (Espacio para marcar, Enter para confirmar, ESC para cancelar):',
+    options: services.map(s => ({ value: s, label: s })),
+    required: false,
+  });
+
+  if (handleCancel(selected) || !selected.length) {
+    log.warn('Operación cancelada. No se inició nada.');
+    return pause();
+  }
+
+  const spin = clack.spinner();
+  spin.start(`Iniciando: ${selected.join(', ')}...`);
+  runCmd(`docker compose up -d ${selected.join(' ')}`, true);
+  spin.stop(log.ready(`${selected.join(', ')} iniciados correctamente.`) || '');
+  console.log('');
+  await pause();
+}
+
+// ─────────────────────────────────────────────
+//  Gestionar servicio específico
+// ─────────────────────────────────────────────
+async function manageServiceMenu() {
+  const services = getServices();
+
+  const service = await clack.select({
+    message: 'Selecciona un servicio:',
+    options: [
+      ...services.map(s => ({ value: s, label: s })),
+      { value: 'back', label: '⬅️  Volver', hint: '' },
+    ],
+  });
+
+  if (handleCancel(service) || service === 'back') return;
   await serviceActionMenu(service);
 }
 
+const SERVICE_UIS = {
+  'minio':        'http://localhost:9001',
+  'mongo-express':'http://localhost:8081',
+  'adminer':      'http://localhost:8080',
+  'rabbitmq':     'http://localhost:15672',
+  'kibana':       'http://localhost:5601',
+  'grafana':      'http://localhost:3000',
+  'jaeger':       'http://localhost:16686',
+  'mailpit':      'http://localhost:8025',
+  'keycloak':     'http://localhost:8082',
+  'traefik':      'http://localhost:8083',
+};
+
+const CRED_SERVICES = ['postgres', 'mysql', 'mongodb', 'redis', 'elasticsearch'];
+
 async function serviceActionMenu(service) {
-  console.clear();
-  console.log(chalk.magenta.bold(`\n🔧 Gestionando servicio: ${chalk.white.bold(service)}\n`));
+  printBanner(`Servicio: ${service}`);
+  clack.intro(chalk.magenta(`⚙️  Gestionando: ${chalk.white.bold(service)}`));
 
-  const uis = {
-    'minio': 'http://localhost:9001',
-    'mongo-express': 'http://localhost:8081',
-    'adminer': 'http://localhost:8080',
-    'rabbitmq': 'http://localhost:15672',
-    'kibana': 'http://localhost:5601',
-    'grafana': 'http://localhost:3000',
-    'jaeger': 'http://localhost:16686',
-    'mailpit': 'http://localhost:8025',
-    'keycloak': 'http://localhost:8082',
-    'traefik': 'http://localhost:8083'
-  };
-
-  const choices = [
-    { name: '▶️  Iniciar', value: 'start' },
-    { name: '⏹️  Detener', value: 'stop' },
-    { name: '🔄 Reiniciar', value: 'restart' },
-    { name: '📄 Ver Logs (Tiempo real)', value: 'logs' },
-    { name: '📈 Ver Estadísticas (CPU/RAM)', value: 'stats' }
+  const options = [
+    { value: 'start',   label: '▶️  Iniciar' },
+    { value: 'stop',    label: '⏹️  Detener' },
+    { value: 'restart', label: '🔄 Reiniciar' },
+    { value: 'logs',    label: '📄 Ver Logs',          hint: 'Streaming en tiempo real (Ctrl+C para salir)' },
+    { value: 'stats',   label: '📈 Ver Estadísticas',  hint: 'CPU/RAM en vivo (Ctrl+C para salir)' },
+    { value: 'env',     label: '🔐 Ver Variables de Entorno' },
   ];
 
-  if (uis[service]) {
-    choices.push({ name: '🌐 Abrir Interfaz Web (UI)', value: 'open_ui' });
-  }
+  if (SERVICE_UIS[service])     options.push({ value: 'open_ui', label: '🌐 Abrir Interfaz Web', hint: SERVICE_UIS[service] });
+  if (CRED_SERVICES.includes(service)) options.push({ value: 'creds', label: '🔑 Generar Credenciales / .env', hint: 'Copia al portapapeles' });
+  options.push({ value: 'wipe',  label: '💣 Borrar Datos Locales (Hard Reset)', hint: '⚠️ Irreversible' });
+  options.push({ value: 'back',  label: '⬅️  Volver' });
 
-  if (['postgres', 'mysql', 'mongodb', 'redis', 'elasticsearch'].includes(service)) {
-    choices.push({ name: '🔑 Generar Credenciales/Env (Prisma, Mongoose, etc)', value: 'creds' });
-  }
+  const action = await clack.select({ message: `Acción para ${service}:`, options });
 
-  choices.push({ name: '💣 Borrar Datos Locales (Hard Reset)', value: 'wipe' });
-  choices.push(new inquirer.Separator());
-  choices.push({ name: '⬅️  Volver atrás', value: 'back' });
-
-  const { action } = await inquirer.prompt([{
-    type: 'list',
-    name: 'action',
-    message: `Acción para ${service}:`,
-    choices
-  }]);
+  if (handleCancel(action) || action === 'back') return;
 
   switch (action) {
-    case 'start': runCmd(`docker compose up -d ${service}`); await pause(); break;
-    case 'stop': runCmd(`docker compose stop ${service}`); await pause(); break;
-    case 'restart': runCmd(`docker compose restart ${service}`); await pause(); break;
+    case 'start': {
+      const spin = clack.spinner();
+      spin.start(`Iniciando ${service}...`);
+      runCmd(`docker compose up -d ${service}`, true);
+      spin.stop(chalk.greenBright(`${service} iniciado.`));
+      await pause();
+      break;
+    }
+    case 'stop': {
+      const spin = clack.spinner();
+      spin.start(`Deteniendo ${service}...`);
+      runCmd(`docker compose stop ${service}`, true);
+      spin.stop(chalk.greenBright(`${service} detenido.`));
+      await pause();
+      break;
+    }
+    case 'restart': {
+      const spin = clack.spinner();
+      spin.start(`Reiniciando ${service}...`);
+      runCmd(`docker compose restart ${service}`, true);
+      spin.stop(chalk.greenBright(`${service} reiniciado.`));
+      await pause();
+      break;
+    }
     case 'logs':
-      console.log(chalk.yellow(`\nMostrando logs para ${service} (Presiona Ctrl+C para salir):\n`));
-      try { execSync(`docker compose logs -f ${service}`, { cwd: composeDir, stdio: 'inherit' }); } catch(e) {}
+      log.info(`Logs de ${service} → Ctrl+C para volver:`);
+      console.log('');
+      try { execSync(`docker compose logs -f ${service}`, { cwd: composeDir, stdio: 'inherit' }); } catch {}
       break;
     case 'stats':
-      console.log(chalk.yellow(`\nMostrando estadísticas para ${service} (Presiona Ctrl+C para salir):\n`));
+      log.info(`Stats de ${service} → Ctrl+C para volver:`);
+      console.log('');
       try {
-        const psOutput = runCmd(`docker compose ps -q ${service}`, true).trim();
-        if (psOutput) execSync(`docker stats ${psOutput}`, { stdio: 'inherit' });
-        else { console.log(chalk.red('El contenedor no está corriendo.')); await pause(); }
-      } catch(e) {}
+        const id = runCmd(`docker compose ps -q ${service}`, true)?.trim();
+        if (id) execSync(`docker stats ${id}`, { stdio: 'inherit' });
+        else log.warn('El contenedor no está corriendo.');
+      } catch {}
+      await pause();
       break;
+    case 'env': {
+      const envVars = getParsedCompose().services[service]?.environment;
+      if (envVars) {
+        clack.note(
+          Array.isArray(envVars)
+            ? envVars.map(v => chalk.yellow(v)).join('\n')
+            : Object.entries(envVars).map(([k, v]) => `${chalk.yellow(k)}=${v}`).join('\n'),
+          `Variables de Entorno — ${service}`
+        );
+      } else {
+        log.warn('No hay variables de entorno explícitas para este servicio.');
+      }
+      await pause();
+      break;
+    }
     case 'open_ui':
-      console.log(chalk.blue(`Abriendo ${uis[service]} en el navegador...`));
-      open(uis[service]);
+      log.info(`Abriendo ${SERVICE_UIS[service]} en tu navegador...`);
+      open(SERVICE_UIS[service]);
       await pause();
       break;
     case 'creds':
       showCredentials(service);
       await pause();
       break;
-    case 'wipe':
-      const { confirm } = await inquirer.prompt([{
-        type: 'confirm', name: 'confirm', default: false,
-        message: chalk.red(`¿Estás seguro? Esto borrará PERMANENTEMENTE los datos locales de ${service} y lo reiniciará limpio.`)
-      }]);
-      if (confirm) {
-        console.log(chalk.yellow(`\nDeteniendo ${service}...`));
+    case 'wipe': {
+      const ok = await clack.confirm({
+        message: chalk.red(`¿Borrar PERMANENTEMENTE los datos locales de ${service}? Esto no tiene vuelta atrás.`),
+        initialValue: false,
+      });
+      if (ok && !clack.isCancel(ok)) {
+        const spin = clack.spinner();
+        spin.start('Borrando contenedor y volumen local...');
         runCmd(`docker compose stop ${service}`, true);
         runCmd(`docker compose rm -f ${service}`, true);
-        const rmCmd = `rm -rf ${path.join(composeDir, 'data', service)}`;
-        console.log(chalk.yellow(`Borrando volumen local...`));
-        try { 
-           execSync(rmCmd); 
-           console.log(chalk.green('✅ Datos borrados. Levántalo de nuevo para empezar limpio.')); 
-        } 
-        catch (e) { console.log(chalk.red('Error borrando carpeta de datos.')); }
+        try { execSync(`rm -rf ${path.join(composeDir, 'data', service)}`); } catch {}
+        spin.stop(chalk.greenBright('Datos borrados. Levanta el servicio para empezar limpio.'));
+      } else {
+        log.warn('Operación cancelada.');
       }
       await pause();
       break;
-    case 'back': return manageServiceMenu();
+    }
   }
+
   await serviceActionMenu(service);
 }
 
+// ─────────────────────────────────────────────
+//  Credenciales
+// ─────────────────────────────────────────────
 function showCredentials(service) {
-  let text = '';
-  let toCopy = '';
-  
-  if (service === 'postgres') {
-    text = `
-${chalk.cyan('=== Credenciales para PostgreSQL ===')}
+  const creds = {
+    postgres: {
+      local:     'postgresql://devuser:devpassword@localhost:5432/devdb',
+      docker:    'postgresql://devuser:devpassword@postgres:5432/devdb',
+    },
+    mongodb: {
+      local:  'mongodb://devuser:devpassword@localhost:27017/',
+      docker: 'mongodb://devuser:devpassword@mongodb:27017/',
+    },
+    mysql: {
+      local:  'mysql://devuser:devpassword@localhost:3306/devdb',
+      docker: 'mysql://devuser:devpassword@mysql:3306/devdb',
+    },
+    redis: {
+      local:  'redis://localhost:6379',
+      docker: 'redis://redis:6379',
+    },
+    elasticsearch: {
+      local:  'http://localhost:9200',
+      docker: 'http://elasticsearch:9200',
+    },
+  };
 
-Si corres tu app de NestJS/Next en tu Mac (localhost):
-${chalk.green('postgresql://devuser:devpassword@localhost:5432/devdb')}
+  const c = creds[service];
+  if (!c) { log.warn('No hay credenciales registradas para este servicio.'); return; }
 
-Si corres tu app en un contenedor (dentro de la misma red):
-${chalk.yellow('postgresql://devuser:devpassword@postgres:5432/devdb')}
-`;
-    toCopy = 'postgresql://devuser:devpassword@localhost:5432/devdb';
-  } else if (service === 'mongodb') {
-    text = `
-${chalk.cyan('=== Credenciales para MongoDB (Mongoose) ===')}
+  clack.note(
+    `${chalk.gray('En tu Mac (localhost):\n')}${chalk.greenBright(c.local)}\n\n${chalk.gray('App dockerizada (red interna):\n')}${chalk.yellow(c.docker)}`,
+    `🔑 Credenciales — ${service}`
+  );
 
-Si corres tu app en tu Mac (localhost):
-${chalk.green('mongodb://devuser:devpassword@localhost:27017/')}
-
-Si corres tu app en un contenedor:
-${chalk.yellow('mongodb://devuser:devpassword@mongodb:27017/')}
-`;
-    toCopy = 'mongodb://devuser:devpassword@localhost:27017/';
-  } else if (service === 'mysql') {
-     text = `\nURL: ${chalk.green('mysql://devuser:devpassword@localhost:3306/devdb')}\n`;
-     toCopy = 'mysql://devuser:devpassword@localhost:3306/devdb';
-  } else if (service === 'redis') {
-     text = `\nURL: ${chalk.green('redis://localhost:6379')}\n`;
-     toCopy = 'redis://localhost:6379';
-  } else {
-     text = chalk.yellow('No hay credenciales específicas guardadas para este servicio.');
-  }
-  
-  console.log(text);
-  if (toCopy) {
-    try { 
-      execSync(`echo "${toCopy}" | pbcopy`); 
-      console.log(chalk.magenta('📋 URL de localhost copiada al portapapeles automáticamente.')); 
-    } catch(e){}
-  }
+  try {
+    execSync(`echo "${c.local}" | pbcopy`);
+    log.ready('URL localhost copiada al portapapeles.');
+  } catch {}
 }
 
+// ─────────────────────────────────────────────
+//  Auto-inicio
+// ─────────────────────────────────────────────
 async function autoStartMenu() {
-  console.clear();
-  console.log(chalk.magenta.bold('\n🔄 Configuración de Auto-Inicio en Mac Boot\n'));
-  console.log(chalk.gray('Selecciona qué servicios quieres que se arranquen de forma automática cuando enciendes tu computadora. Los no seleccionados requerirán que los inicies a mano.\n'));
+  printBanner('Auto-Inicio en Mac Boot');
+  clack.intro(chalk.magenta('🔄 Configuración de Auto-Inicio'));
+  console.log(chalk.gray('Los servicios seleccionados arrancarán automáticamente al encender tu Mac.\nLos no seleccionados permanecerán apagados hasta que los inicies manualmente.\n'));
 
   const parsed = getParsedCompose();
   const services = Object.keys(parsed.services);
-  
-  const choices = services.map(s => {
-    // unless-stopped is default. if it's 'no', it's disabled.
-    const isAlways = parsed.services[s].restart !== 'no';
-    return { name: s, value: s, checked: isAlways };
+
+  const selected = await clack.multiselect({
+    message: 'Servicios que arrancan automáticamente:',
+    options: services.map(s => ({
+      value: s,
+      label: s,
+      hint: parsed.services[s].restart !== 'no' ? 'activo' : 'inactivo',
+    })),
+    initialValues: services.filter(s => parsed.services[s].restart !== 'no'),
+    required: false,
   });
 
-  const { selected } = await inquirer.prompt([{
-    type: 'checkbox',
-    name: 'selected',
-    message: 'Servicios con Auto-Arranque (Espacio para seleccionar):',
-    choices
-  }]);
+  if (handleCancel(selected)) { log.warn('Sin cambios.'); return; }
 
   services.forEach(s => {
-    if (selected.includes(s)) {
-      parsed.services[s].restart = 'unless-stopped';
-    } else {
-      parsed.services[s].restart = 'no';
-    }
+    parsed.services[s].restart = selected.includes(s) ? 'unless-stopped' : 'no';
   });
 
   saveCompose(parsed);
-  console.log(chalk.green('\n✅ Configuración guardada exitosamente en el docker-compose.yml.'));
-  await pause();
+  clack.outro(chalk.greenBright('✅ Configuración guardada en docker-compose.yml.'));
 }
 
+// ─────────────────────────────────────────────
+//  Guía de integración
+// ─────────────────────────────────────────────
 function showIntegrationGuide() {
-  console.clear();
-  console.log(chalk.cyan(`
-=== 🔗 Cómo conectar tus apps a esta infraestructura ===
-
-Si estás creando una app en Next.js, NestJS, etc., y le configuras su 
-propio archivo docker-compose.yml, añade este bloque de red al final de TU archivo:
-
+  printBanner('Guía de Integración');
+  clack.note(
+    `${chalk.gray('Añade esto al final del docker-compose.yml de TU app (NestJS, Next.js, etc.):\n')}
 ${chalk.yellow(`networks:
   default:
     name: infra_dev_network
     external: true`)}
 
-👉 De esta manera, tus contenedores se fusionarán en la misma red y 
-podrán conectarse directamente usando el nombre del servicio como Host.
-
-Ejemplo desde tu NestJS dockerizado hacia Postgres:
-  DATABASE_URL="postgresql://devuser:devpassword@postgres:5432/devdb"
-  `));
-  pause().then(dockerMenu);
+${chalk.gray('Una vez configurado, conéctate usando el nombre del contenedor como host:')}
+  DATABASE_URL="${chalk.greenBright('postgresql://devuser:devpassword@postgres:5432/devdb')}"
+  REDIS_URL="${chalk.greenBright('redis://redis:6379')}"
+  MONGO_URI="${chalk.greenBright('mongodb://devuser:devpassword@mongodb:27017/')}"`,
+    '🔗 Integración de Red'
+  );
 }
 
-// ============== DEV TOOLS ==============
+// ─────────────────────────────────────────────
+//  DEV TOOLS
+// ─────────────────────────────────────────────
 async function devToolsMenu() {
-  console.clear();
-  console.log(chalk.blue.bold('\n🛠️  Developer Tools (Asistente Global)\n'));
+  printBanner('Developer Tools');
+  clack.intro(chalk.blue('🛠️  Asistente del Desarrollador'));
 
-  const { action } = await inquirer.prompt([{
-    type: 'list',
-    name: 'action',
+  const action = await clack.select({
     message: 'Selecciona una herramienta:',
-    choices: [
-      { name: '🔪 Port Killer (Matar un proceso bloqueando un puerto)', value: 'portkiller' },
-      { name: '🩺 Doctor (Versiones del entorno & Tu IP Local)', value: 'doctor' },
-      { name: '📚 Cheat Sheet (Soluciones a problemas comunes)', value: 'cheatsheet' },
-      new inquirer.Separator(),
-      { name: '⬅️  Volver al menú principal', value: 'back' }
-    ]
-  }]);
+    options: [
+      { value: 'portkiller', label: '🔪 Port Killer',   hint: 'Mata el proceso que ocupa un puerto' },
+      { value: 'doctor',     label: '🩺 Doctor',         hint: 'Versiones del entorno e IP local' },
+      { value: 'cheatsheet', label: '📚 Cheat Sheet',    hint: 'Soluciones rápidas a problemas comunes' },
+      { value: 'back',       label: '⬅️  Volver',         hint: '' },
+    ],
+  });
 
-  switch (action) {
-    case 'portkiller':
-      const { port } = await inquirer.prompt([{ type: 'input', name: 'port', message: '¿Qué puerto está bloqueado? (ej. 3000 o 5432):' }]);
-      try {
-        const pids = execSync(`lsof -t -i:${port}`, { encoding: 'utf-8' }).trim().split('\n');
-        if (pids[0]) {
-          console.log(chalk.yellow(`\n⚠️ Se encontraron procesos secuestrando el puerto ${port}: PIDs [${pids.join(', ')}]`));
-          const { confirm } = await inquirer.prompt([{ type: 'confirm', name: 'confirm', message: `¿Destruir estos procesos?` }]);
-          if (confirm) {
-            pids.forEach(pid => { try { execSync(`kill -9 ${pid}`); } catch(e){} });
-            console.log(chalk.green('\n✅ Procesos eliminados. El puerto ha sido liberado.'));
-          }
-        } else {
-           console.log(chalk.green(`\nEl puerto ${port} está libre.`));
+  if (handleCancel(action) || action === 'back') return showMainMenu();
+
+  if (action === 'portkiller') {
+    const port = await clack.text({
+      message: '¿Qué puerto está bloqueado?',
+      placeholder: '3000',
+      validate: v => isNaN(Number(v)) ? 'Ingresa un número de puerto válido.' : undefined,
+    });
+    if (handleCancel(port)) return devToolsMenu();
+
+    try {
+      const pids = execSync(`lsof -t -i:${port}`, { encoding: 'utf-8' }).trim().split('\n').filter(Boolean);
+      if (pids.length) {
+        log.warn(`Puerto ${port} ocupado por PIDs: [${pids.join(', ')}]`);
+        const ok = await clack.confirm({ message: '¿Matar estos procesos?', initialValue: false });
+        if (!clack.isCancel(ok) && ok) {
+          pids.forEach(pid => { try { execSync(`kill -9 ${pid}`); } catch {} });
+          log.ready(`Puerto ${port} liberado exitosamente.`);
         }
-      } catch (e) {
-        console.log(chalk.green(`\nEl puerto ${port} está libre o no se detectaron procesos usándolo.`));
+      } else {
+        log.ready(`El puerto ${port} está libre. No hay procesos bloqueándolo.`);
       }
-      await pause();
-      return devToolsMenu();
+    } catch {
+      log.ready(`El puerto ${port} está libre.`);
+    }
+    await pause();
+    return devToolsMenu();
+  }
 
-    case 'doctor':
-      console.clear();
-      console.log(chalk.cyan.bold('\n🩺 Diagnóstico de Entorno (Doctor)\n'));
-      const getV = (cmd) => { try { return execSync(cmd, { encoding:'utf-8' }).trim(); } catch(e){ return chalk.red('No instalado'); } };
-      
-      console.log(chalk.magenta('--- Versiones ---'));
-      console.log(`Node.js:   ${chalk.green(getV('node -v'))}`);
-      console.log(`NPM:       ${chalk.green(getV('npm -v'))}`);
-      console.log(`Git:       ${chalk.green(getV('git --version'))}`);
-      console.log(`Docker:    ${chalk.green(getV('docker --version'))}`);
-      
-      console.log(chalk.magenta('\n--- Red Local ---'));
-      const nets = os.networkInterfaces();
-      for (const name of Object.keys(nets)) {
-        for (const net of nets[name]) {
-          if (net.family === 'IPv4' && !net.internal) {
-             console.log(`IP de tu Mac: ${chalk.yellow(net.address)}`);
-             console.log(chalk.gray(`(Usa esta IP en tu celular para acceder a tus apps locales, ej: http://${net.address}:3000)`));
-          }
+  if (action === 'doctor') {
+    printBanner('Doctor — Diagnóstico de Entorno');
+    const getV = (cmd) => { try { return execSync(cmd, { encoding: 'utf-8' }).trim(); } catch { return chalk.red('No instalado'); } };
+
+    clack.note(
+      [
+        `${chalk.gray('Node.js:')}   ${chalk.green(getV('node -v'))}`,
+        `${chalk.gray('NPM:')}       ${chalk.green(getV('npm -v'))}`,
+        `${chalk.gray('Git:')}       ${chalk.green(getV('git --version'))}`,
+        `${chalk.gray('Docker:')}    ${chalk.green(getV('docker --version'))}`,
+      ].join('\n'),
+      '⚙️ Versiones del Stack'
+    );
+
+    const nets = os.networkInterfaces();
+    const ips = [];
+    for (const name of Object.keys(nets)) {
+      for (const net of nets[name]) {
+        if (net.family === 'IPv4' && !net.internal) {
+          ips.push(`${chalk.gray(name + ':')} ${chalk.yellow(net.address)}`);
         }
       }
-      console.log('');
-      await pause();
-      return devToolsMenu();
+    }
+    clack.note(
+      ips.join('\n') + `\n\n${chalk.gray('Úsala en tu celular: ')}${chalk.greenBright('http://<ip>:3000')}`,
+      '🌐 Red Local'
+    );
 
-    case 'cheatsheet':
-      console.clear();
-      console.log(chalk.cyan(`
-📚 Respuestas Rápidas para Developers:
+    await pause();
+    return devToolsMenu();
+  }
 
-1. ¿Tu app de Next.js se quedó tonta, no refresca cambios o lanza error de caché?
-   -> Corre: ${chalk.yellow('rm -rf .next/')} en la carpeta del proyecto.
-
-2. ¿Hiciste un commit en Git por accidente y quieres deshacerlo SIN perder tus cambios?
-   -> Corre: ${chalk.yellow('git reset HEAD~1')}
-
-3. ¿Tienes procesos de Node "zombies" consumiendo tu CPU en el fondo?
-   -> Corre: ${chalk.yellow('killall node')}
-
-4. ¿Docker no te deja levantar apps porque dice "No space left on device"?
-   -> Ve al menú "System Health" de esta CLI y ejecuta "Limpiar Caché de Docker (Prune)".
-
-5. ¿Cómo borro la carpeta node_modules rápido si se corrompió?
-   -> Corre: ${chalk.yellow('rm -rf node_modules package-lock.json && npm install')}
-      `));
-      await pause();
-      return devToolsMenu();
-
-    case 'back':
-      return showMainMenu();
+  if (action === 'cheatsheet') {
+    printBanner('Cheat Sheet');
+    clack.note(
+      [
+        `${chalk.yellow('1. Caché de Next.js rota:')}`,
+        `   ${chalk.greenBright('rm -rf .next/')}`,
+        '',
+        `${chalk.yellow('2. Deshacer último commit (sin perder cambios):')}`,
+        `   ${chalk.greenBright('git reset HEAD~1')}`,
+        '',
+        `${chalk.yellow('3. Matar todos los procesos de Node:')}`,
+        `   ${chalk.greenBright('killall node')}`,
+        '',
+        `${chalk.yellow('4. Docker sin espacio en disco:')}`,
+        `   ${chalk.greenBright('→ System Health > Prune')}`,
+        '',
+        `${chalk.yellow('5. Reinstalar node_modules corrompido:')}`,
+        `   ${chalk.greenBright('rm -rf node_modules package-lock.json && npm install')}`,
+      ].join('\n'),
+      '📚 Soluciones Rápidas'
+    );
+    await pause();
+    return devToolsMenu();
   }
 }
 
-// ============== SYSTEM HEALTH ==============
+// ─────────────────────────────────────────────
+//  SYSTEM HEALTH
+// ─────────────────────────────────────────────
 async function systemHealthMenu() {
-  console.clear();
-  console.log(chalk.blue.bold('\n📈 System Health & Docker Stats\n'));
-  
-  const freeRamGB = (os.freemem() / 1024 / 1024 / 1024).toFixed(2);
-  const totalRamGB = (os.totalmem() / 1024 / 1024 / 1024).toFixed(2);
-  
-  console.log(chalk.magenta('--- Rendimiento de tu Mac ---'));
-  console.log(`Memoria RAM Libre: ${chalk.yellow(freeRamGB + ' GB')} de ${totalRamGB} GB`);
-  console.log(`CPUs Lógicos:      ${os.cpus().length}`);
+  printBanner('System Health');
+  clack.intro(chalk.blue('📈 Salud del Sistema y Docker'));
 
-  console.log(chalk.magenta('\n--- Uso de disco de Docker ---'));
-  runCmd('docker system df', false);
+  const freeGB  = (os.freemem()  / 1024 ** 3).toFixed(2);
+  const totalGB = (os.totalmem() / 1024 ** 3).toFixed(2);
+  const usedPct = (((os.totalmem() - os.freemem()) / os.totalmem()) * 100).toFixed(1);
 
+  const ramBar = () => {
+    const used = Math.round((Number(usedPct) / 100) * 20);
+    const bar  = chalk.red('█'.repeat(used)) + chalk.gray('░'.repeat(20 - used));
+    return `[${bar}] ${usedPct}% usado`;
+  };
+
+  clack.note(
+    [
+      `${chalk.gray('RAM libre:')}  ${chalk.green(freeGB + ' GB')} de ${chalk.white(totalGB + ' GB')}`,
+      `${chalk.gray('Uso RAM:')}    ${ramBar()}`,
+      `${chalk.gray('CPUs:')}       ${chalk.yellow(os.cpus().length + ' cores')} — ${os.cpus()[0].model}`,
+    ].join('\n'),
+    '🖥️  Recursos del Sistema'
+  );
+
+  log.info('Uso de disco de Docker:');
   console.log('');
-  const { action } = await inquirer.prompt([{
-    type: 'list',
-    name: 'action',
-    message: 'Opciones de salud del sistema:',
-    choices: [
-      { name: '🧹 Limpiar Caché de Docker (Prune - Libera espacio en disco)', value: 'prune' },
-      new inquirer.Separator(),
-      { name: '⬅️  Volver al menú principal', value: 'back' }
-    ]
-  }]);
+  runCmd('docker system df', false);
+  console.log('');
+
+  const action = await clack.select({
+    message: 'Opciones:',
+    options: [
+      { value: 'prune', label: '🧹 Limpiar Caché de Docker (Prune)', hint: 'Libera espacio en disco' },
+      { value: 'back',  label: '⬅️  Volver al menú principal' },
+    ],
+  });
+
+  if (handleCancel(action) || action === 'back') return showMainMenu();
 
   if (action === 'prune') {
-    console.log(chalk.red('\n¡CUIDADO! Esto borrará:'));
-    console.log('- Contenedores detenidos.\n- Redes no usadas.\n- Imágenes "colgantes" (caché de builds viejas).');
-    const { confirm } = await inquirer.prompt([{ type: 'confirm', name: 'confirm', message: '¿Ejecutar limpieza?' }]);
-    if (confirm) {
-      console.log('');
-      runCmd('docker system prune -f');
-      console.log(chalk.green('\n✅ Limpieza de espacio completada.'));
+    log.warn('Esto borrará contenedores detenidos, redes no usadas e imágenes colgantes.');
+    const ok = await clack.confirm({ message: '¿Ejecutar limpieza?', initialValue: false });
+    if (!clack.isCancel(ok) && ok) {
+      const spin = clack.spinner();
+      spin.start('Limpiando caché de Docker...');
+      runCmd('docker system prune -f', true);
+      spin.stop(chalk.greenBright('Limpieza completada. Espacio liberado.'));
+    } else {
+      log.warn('Limpieza cancelada.');
     }
     await pause();
     return systemHealthMenu();
-  } else {
-    return showMainMenu();
   }
 }
 
+// ─────────────────────────────────────────────
+//  Pausa helper
+// ─────────────────────────────────────────────
 async function pause() {
-  await inquirer.prompt([{ type: 'input', name: 'continue', message: chalk.gray('Presiona Enter para continuar...') }]);
+  await clack.text({ message: chalk.gray('↩  Presiona Enter para continuar...') }).catch(() => {});
 }
 
-showMainMenu().catch(err => console.error(chalk.red('Error no manejado:'), err));
+// ─────────────────────────────────────────────
+//  Entry point
+// ─────────────────────────────────────────────
+showMainMenu().catch(err => log.error(`Error no manejado: ${err}`));
