@@ -6,6 +6,7 @@ import * as clack from '@clack/prompts';
 import { printBanner, log, pause, handleCancel } from '../lib/ui.js';
 import { run, getServiceNames, getParsed, saveParsed } from '../lib/compose.js';
 import { serviceMenu } from './service.js';
+import { renderDashboard } from '../lib/dashboard.js';
 
 export async function dockerMenu(backFn) {
   while (true) {
@@ -30,10 +31,19 @@ export async function dockerMenu(backFn) {
     switch (action) {
       case 'status':
         printBanner('Estado de la Infraestructura');
-        log.info('Contenedores activos:');
-        log.blank();
-        run('docker compose ps');
-        log.blank();
+        clack.intro(chalk.cyanBright('📊  Contenedores del proyecto'));
+
+        const spin = clack.spinner();
+        spin.start('Obteniendo estado y métricas...');
+        await new Promise(r => setTimeout(r, 300)); // let spinner render
+        spin.stop('');
+
+        const withStats = await clack.confirm({
+          message: '¿Incluir CPU y RAM en vivo? (Añade ~300ms)',
+          initialValue: false,
+        });
+
+        renderDashboard(!clack.isCancel(withStats) && withStats === true);
         await pause();
         break;
 
