@@ -4,3 +4,12 @@
 
 # Environment variables
 .env
+/data/mongo/
+/data/cassandra/
+/data/rabbitmq/
+/data/kafka/
+/data/meilisearch/
+/data/elasticsearch/
+/data/prometheus/
+/data/grafana/
+/data/keycloak/

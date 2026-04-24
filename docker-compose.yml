@@ -1,6 +1,7 @@
 version: '3.8'
 
 services:
+  # === DATABASES & STORAGE ===
   postgres:
     image: postgres:15-alpine
     container_name: dev_postgres
@@ -51,6 +52,40 @@ services:
     command: server /data --console-address ":9001"
     restart: unless-stopped
 
+  mongodb:
+    image: mongo:6
+    container_name: dev_mongodb
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: devuser
+      MONGO_INITDB_ROOT_PASSWORD: devpassword
+    ports:
+      - "27017:27017"
+    volumes:
+      - ./data/mongo:/data/db
+    restart: unless-stopped
+
+  mongo-express:
+    image: mongo-express
+    container_name: dev_mongo_express
+    environment:
+      ME_CONFIG_MONGODB_ADMINUSERNAME: devuser
+      ME_CONFIG_MONGODB_ADMINPASSWORD: devpassword
+      ME_CONFIG_MONGODB_URL: mongodb://devuser:devpassword@mongodb:27017/
+    ports:
+      - "8081:8081"
+    depends_on:
+      - mongodb
+    restart: unless-stopped
+
+  cassandra:
+    image: cassandra:4
+    container_name: dev_cassandra
+    ports:
+      - "9042:9042"
+    volumes:
+      - ./data/cassandra:/var/lib/cassandra
+    restart: unless-stopped
+
   adminer:
     image: adminer
     container_name: dev_adminer
@@ -59,4 +94,143 @@ services:
     depends_on:
       - postgres
       - mysql
+    restart: unless-stopped
+
+  # === MESSAGE BROKERS & EVENTS ===
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: dev_rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: devuser
+      RABBITMQ_DEFAULT_PASS: devpassword
+    ports:
+      - "5672:5672"   # Protocolo
+      - "15672:15672" # Management UI
+    volumes:
+      - ./data/rabbitmq:/var/lib/rabbitmq
+    restart: unless-stopped
+
+  kafka:
+    image: bitnami/kafka:3.5
+    container_name: dev_kafka
+    environment:
+      KAFKA_CFG_NODE_ID: 1
+      KAFKA_CFG_PROCESS_ROLES: broker,controller
+      KAFKA_CFG_CONTROLLER_QUORUM_VOTERS: 1@localhost:9093
+      KAFKA_CFG_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093
+      KAFKA_CFG_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
+      KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+      KAFKA_CFG_CONTROLLER_LISTENER_NAMES: CONTROLLER
+    ports:
+      - "9092:9092"
+    volumes:
+      - ./data/kafka:/bitnami/kafka
+    restart: unless-stopped
+
+  # === SEARCH ENGINES ===
+  meilisearch:
+    image: getmeili/meilisearch:v1.4
+    container_name: dev_meilisearch
+    environment:
+      MEILI_MASTER_KEY: devmasterkey
+      MEILI_ENV: development
+    ports:
+      - "7700:7700"
+    volumes:
+      - ./data/meilisearch:/meili_data
+    restart: unless-stopped
+
+  elasticsearch:
+    image: elasticsearch:8.9.1
+    container_name: dev_elasticsearch
+    environment:
+      discovery.type: single-node
+      xpack.security.enabled: "false" # Disabled for local dev simplicity
+      ES_JAVA_OPTS: "-Xms512m -Xmx512m"
+    ports:
+      - "9200:9200"
+    volumes:
+      - ./data/elasticsearch:/usr/share/elasticsearch/data
+    restart: unless-stopped
+
+  kibana:
+    image: kibana:8.9.1
+    container_name: dev_kibana
+    ports:
+      - "5601:5601"
+    environment:
+      ELASTICSEARCH_HOSTS: http://elasticsearch:9200
+    depends_on:
+      - elasticsearch
+    restart: unless-stopped
+
+  # === MONITORING & OBSERVABILITY ===
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: dev_prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./data/prometheus:/prometheus
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: dev_grafana
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: admin
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./data/grafana:/var/lib/grafana
+    restart: unless-stopped
+
+  jaeger:
+    image: jaegertracing/all-in-one:latest
+    container_name: dev_jaeger
+    ports:
+      - "16686:16686" # UI
+      - "4317:4317"   # OTLP gRPC
+      - "4318:4318"   # OTLP HTTP
+    restart: unless-stopped
+
+  # === MAIL TESTING ===
+  mailpit:
+    image: axllent/mailpit
+    container_name: dev_mailpit
+    ports:
+      - "8025:8025" # UI
+      - "1025:1025" # SMTP
+    restart: unless-stopped
+
+  # === IDENTITY & ACCESS MANAGEMENT ===
+  keycloak:
+    image: quay.io/keycloak/keycloak:22.0
+    container_name: dev_keycloak
+    command: start-dev
+    environment:
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: admin
+    ports:
+      - "8082:8080" # 8080 ya está ocupado por adminer
+    volumes:
+      - ./data/keycloak:/opt/keycloak/data
+    restart: unless-stopped
+
+  # === REVERSE PROXY ===
+  traefik:
+    image: traefik:v2.10
+    container_name: dev_traefik
+    command:
+      - "--api.insecure=true"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--entrypoints.web.address=:80"
+    ports:
+      - "80:80"
+      - "8083:8080" # Dashboard Traefik (8080 ya está en uso por adminer)
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
     restart: unless-stopped
