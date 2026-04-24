@@ -50,7 +50,24 @@ Este proyecto contiene la configuración de Docker Compose para una infraestruct
 | **Keycloak** | IAM (Identidad y SSO) | - | [http://localhost:8082](http://localhost:8082) (`admin` / `admin`) |
 | **Traefik** | Reverse Proxy | 80 | [Dashboard: 8083](http://localhost:8083) |
 
-## Uso
+## 🛠 Herramienta CLI de Gestión (Nuevo)
+
+Para hacerte la vida más fácil, este proyecto incluye una **CLI interactiva** que te permite gestionar todos los servicios sin necesidad de usar `docker compose` manualmente.
+
+**Para abrir el menú interactivo, simplemente escribe en tu terminal:**
+```bash
+infra
+```
+
+Con la herramienta podrás:
+- **Ver el estado general** de toda la infraestructura.
+- **Iniciar/Detener** toda la infraestructura o servicios específicos de uno en uno.
+- **Ver los Logs** en tiempo real de cualquier servicio.
+- **Ver el rendimiento en vivo** (CPU y RAM) de un contenedor.
+
+> Si el comando `infra` no funciona, asegúrate de haber ejecutado `cd infra-cli && npm link` en este repositorio.
+
+## Uso Manual (con Docker Compose)
 
 1. **Iniciar servicios específicos** (Recomendado):
    ```bash
