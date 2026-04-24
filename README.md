@@ -1,88 +1,291 @@
 # Dev Infrastructure
 
-Este proyecto contiene la configuración de Docker Compose para una infraestructura de desarrollo local. Proporciona bases de datos y herramientas comunes necesarias para el desarrollo de aplicaciones modernas (microservicios, colas, bases de datos NoSQL, etc.).
+> Infraestructura de desarrollo local basada en Docker: bases de datos, colas de mensajes, motores de búsqueda, monitoreo y herramientas de desarrollo — todo gestionado desde un único comando CLI interactivo.
 
-> **ATENCIÓN: ALTO CONSUMO DE RECURSOS**
-> No se recomienda levantar todos los servicios a la vez a menos que tu máquina cuente con abundante RAM (>16GB/32GB). Levanta solo los contenedores que necesites para tu tarea actual.
+---
 
-## Requisitos
-- Docker
-- Docker Compose
+## 📋 Tabla de Contenidos
 
-## Servicios Incluidos
+- [Requisitos](#-requisitos)
+- [Instalación](#-instalación)
+- [Herramienta CLI (`infra`)](#-herramienta-cli-infra)
+- [Servicios Incluidos](#-servicios-incluidos)
+- [Conectar tus Apps](#-conectar-tus-apps)
+- [Uso Manual con Docker Compose](#-uso-manual-con-docker-compose)
+- [Persistencia de Datos](#-persistencia-de-datos)
 
-### Bases de Datos y Almacenamiento
-| Servicio | Descripción | Puertos | Credenciales / URLs |
-|---|---|---|---|
-| **PostgreSQL** | BD Relacional (v15) | 5432 | User: `devuser`, Pass: `devpassword`, DB: `devdb` |
-| **MySQL** | BD Relacional (v8.0) | 3306 | User: `devuser`/`root`, Pass: `devpassword`, DB: `devdb` |
-| **Redis** | BD Clave-Valor en memoria | 6379 | - |
-| **MongoDB** | BD NoSQL Documentos | 27017 | User: `devuser`, Pass: `devpassword` |
-| **Cassandra** | BD NoSQL Columnar | 9042 | - |
-| **MinIO** | Almacenamiento S3 | API: 9000 | [Console: 9001](http://localhost:9001) (`minioadmin` / `minioadmin`) |
-| **Adminer** | UI BDs Relacionales | - | [http://localhost:8080](http://localhost:8080) |
-| **Mongo Express** | UI para MongoDB | - | [http://localhost:8081](http://localhost:8081) |
+---
 
-### Colas y Eventos (Message Brokers)
-| Servicio | Descripción | Puertos | Credenciales / URLs |
-|---|---|---|---|
-| **RabbitMQ** | Colas de mensajes AMQP | 5672 | [UI: 15672](http://localhost:15672) (`devuser` / `devpassword`) |
-| **Kafka** | Event Streaming (KRaft) | 9092 | - |
+## ⚠️ Advertencia de Recursos
 
-### Motores de Búsqueda
-| Servicio | Descripción | Puertos | Credenciales / URLs |
-|---|---|---|---|
-| **Elasticsearch** | Motor de búsqueda potente | 9200 | (Seguridad deshabilitada para dev) |
-| **Kibana** | UI para Elasticsearch | - | [http://localhost:5601](http://localhost:5601) |
-| **Meilisearch** | Motor de búsqueda rápido/ligero | 7700 | Master Key: `devmasterkey` |
+No se recomienda levantar todos los servicios a la vez. Herramientas como Elasticsearch, Kafka y Cassandra son muy pesadas en memoria. Utiliza la CLI para seleccionar solo los que necesitas.
 
-### Monitoreo y Observabilidad
-| Servicio | Descripción | Puertos | Credenciales / URLs |
-|---|---|---|---|
-| **Prometheus** | Métricas | - | [http://localhost:9090](http://localhost:9090) |
-| **Grafana** | Dashboards | - | [http://localhost:3000](http://localhost:3000) (User: `admin` / Pass: `admin`) |
-| **Jaeger** | Trazabilidad distribuida | gRPC:4317 / HTTP:4318| [UI: 16686](http://localhost:16686) |
+| Recomendación | RAM mínima |
+|---|---|
+| Servicios básicos (Postgres, Redis, MinIO) | 4 GB |
+| Stack completo (con Elastic, Kafka, etc.) | 16 GB+ |
 
-### Herramientas de Desarrollo y API
-| Servicio | Descripción | Puertos | Credenciales / URLs |
-|---|---|---|---|
-| **Mailpit** | Pruebas de email (SMTP) | SMTP: 1025 | [UI: 8025](http://localhost:8025) |
-| **Keycloak** | IAM (Identidad y SSO) | - | [http://localhost:8082](http://localhost:8082) (`admin` / `admin`) |
-| **Traefik** | Reverse Proxy | 80 | [Dashboard: 8083](http://localhost:8083) |
+---
 
-## 🛠 Herramienta CLI de Gestión (Nuevo)
+## 📦 Requisitos
 
-Para hacerte la vida más fácil, este proyecto incluye una **CLI interactiva** que te permite gestionar todos los servicios sin necesidad de usar `docker compose` manualmente.
+### Obligatorios
+| Herramienta | Versión mínima | Instalación |
+|---|---|---|
+| [Docker Desktop](https://www.docker.com/products/docker-desktop/) | 24.x+ | [docs.docker.com](https://docs.docker.com/get-docker/) |
+| [Node.js](https://nodejs.org/) | 18.x+ | [nodejs.org](https://nodejs.org/en/download) |
+| [npm](https://npmjs.com/) | 9.x+ | Incluido con Node.js |
+| Git | 2.x+ | [git-scm.com](https://git-scm.com/) |
 
-**Para abrir el menú interactivo, simplemente escribe en tu terminal:**
+### Por sistema operativo
+
+**macOS**
+```bash
+# Con Homebrew
+brew install node git
+# Docker Desktop: descargar desde docker.com
+```
+
+**Linux (Debian/Ubuntu)**
+```bash
+# Node.js (via nvm — recomendado)
+curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash
+nvm install --lts
+
+# Docker
+curl -fsSL https://get.docker.com | sh
+sudo usermod -aG docker $USER
+```
+
+**Windows**
+```powershell
+# Con winget
+winget install OpenJS.NodeJS
+winget install Git.Git
+# Docker Desktop: descargar desde docker.com
+# Recomendado: usar WSL2 (Windows Subsystem for Linux)
+```
+
+> **Windows:** La CLI y todos los scripts están diseñados para `bash`/`zsh`. En Windows se recomienda usar **WSL2** con Ubuntu para la mejor experiencia. Docker Desktop tiene integración nativa con WSL2.
+
+---
+
+## 🚀 Instalación
+
+### 1. Clonar el repositorio
+
+```bash
+git clone <url-del-repositorio> infra-dev
+cd infra-dev
+```
+
+### 2. Instalar la CLI
+
+```bash
+cd infra-cli
+npm install
+npm link        # Registra el comando global 'infra'
+cd ..
+```
+
+### 3. Verificar instalación
+
 ```bash
 infra
 ```
 
-Con la herramienta podrás:
-- **Ver el estado general** de toda la infraestructura.
-- **Iniciar/Detener** toda la infraestructura o servicios específicos de uno en uno.
-- **Ver los Logs** en tiempo real de cualquier servicio.
-- **Ver el rendimiento en vivo** (CPU y RAM) de un contenedor.
+Si todo está correcto, verás el banner de **INFRA CLI** con el menú principal.
 
-> Si el comando `infra` no funciona, asegúrate de haber ejecutado `cd infra-cli && npm link` en este repositorio.
+---
 
-## Uso Manual (con Docker Compose)
+## 🛠️ Herramienta CLI (`infra`)
 
-1. **Iniciar servicios específicos** (Recomendado):
-   ```bash
-   docker-compose up -d postgres redis mailpit
-   ```
+La herramienta central del proyecto. Se ejecuta desde cualquier directorio de tu terminal.
 
-2. **Iniciar TODOS los servicios** (Solo si tienes mucha RAM):
-   ```bash
-   docker-compose up -d
-   ```
+```bash
+infra
+```
 
-3. **Detener servicios**:
-   ```bash
-   docker-compose down
-   ```
+### Funcionalidades
 
-## Persistencia de Datos
-Los datos se guardan en `./data/`. Este directorio está ignorado en Git.
+#### 🐳 Docker Infra
+| Opción | Descripción |
+|---|---|
+| Ver estado general | Dashboard con estado, puertos y uptime de todos los servicios |
+| Iniciar servicios | Selección múltiple con checkboxes — arranca solo lo que necesitas |
+| Detener todos | Apaga toda la infraestructura |
+| Gestionar servicio | Por servicio: Logs, Stats, Variables de entorno, Credenciales, Hard Reset, Abrir UI |
+| Auto-Inicio (Boot) | Configura qué servicios arrancan automáticamente al encender tu computadora |
+| Conectar mis apps | Guía con código exacto para conectar apps NestJS/Next.js a la red interna |
+
+#### 🛠️ Dev Tools
+| Opción | Descripción |
+|---|---|
+| Port Killer | Detecta qué proceso tiene secuestrado un puerto y lo mata |
+| Doctor | Muestra versiones de Node, npm, Git, Docker y tu IP local de red |
+| Cheat Sheet | Soluciones rápidas a problemas comunes de desarrollo |
+
+#### 📈 System Health
+| Opción | Descripción |
+|---|---|
+| RAM y CPU | Memoria disponible con barra de uso visual |
+| Espacio Docker | Imágenes, volúmenes y caché de builds |
+| Prune | Limpia la caché de Docker y libera espacio en disco |
+
+### Atajos de teclado en la CLI
+
+| Tecla | Acción |
+|---|---|
+| `↑` / `↓` | Moverse entre opciones |
+| `Enter` | Seleccionar / Confirmar |
+| `Espacio` | Marcar/desmarcar en listas de selección múltiple |
+| `Ctrl+C` | Cancelar / Salir en cualquier momento |
+
+### Reinstalar la CLI
+
+Si el comando `infra` deja de funcionar después de actualizar el repositorio:
+
+```bash
+cd infra-cli
+npm install     # Actualizar dependencias si cambiaron
+npm link        # Volver a registrar el comando global
+```
+
+### Notas por sistema operativo
+
+**macOS / Linux**: Funciona de manera nativa. `npm link` crea el symlink en `/usr/local/bin/infra` o `~/.nvm/versions/node/.../bin/infra`.
+
+**Windows (WSL2)**: Ejecutar todo desde la terminal de WSL2. El comando `infra` quedará disponible dentro del entorno WSL.
+
+**Windows (PowerShell / CMD)**: Funcional con limitaciones — los colores ANSI requieren Windows Terminal. Algunas funciones como Port Killer usan `lsof` que no existe en Windows nativo (sí en WSL2).
+
+---
+
+## 🗄️ Servicios Incluidos
+
+### Bases de Datos y Almacenamiento
+
+| Servicio | Descripción | Puerto | UI / Credenciales |
+|---|---|---|---|
+| **PostgreSQL** 15 | BD Relacional | 5432 | User: `devuser` · Pass: `devpassword` · DB: `devdb` |
+| **MySQL** 8.0 | BD Relacional | 3306 | User: `devuser` · Pass: `devpassword` · DB: `devdb` |
+| **Redis** 7 | Caché / Colas | 6379 | — |
+| **MongoDB** 6 | BD Documentos | 27017 | User: `devuser` · Pass: `devpassword` |
+| **Cassandra** 4 | BD Columnar | 9042 | — |
+| **MinIO** | Almacenamiento S3 | API: 9000 | [localhost:9001](http://localhost:9001) · `minioadmin` / `minioadmin` |
+| **Adminer** | UI BDs Relacionales | 8080 | [localhost:8080](http://localhost:8080) |
+| **Mongo Express** | UI para MongoDB | 8081 | [localhost:8081](http://localhost:8081) |
+
+### Colas y Eventos
+
+| Servicio | Descripción | Puerto | UI |
+|---|---|---|---|
+| **RabbitMQ** 3 | Message Broker AMQP | 5672 | [localhost:15672](http://localhost:15672) · `devuser` / `devpassword` |
+| **Kafka** 3.5 | Event Streaming (KRaft) | 9092 | — |
+
+### Motores de Búsqueda
+
+| Servicio | Descripción | Puerto | Notas |
+|---|---|---|---|
+| **Elasticsearch** 8.9 | Motor de búsqueda | 9200 | Seguridad deshabilitada para dev |
+| **Kibana** 8.9 | UI Elasticsearch | 5601 | [localhost:5601](http://localhost:5601) |
+| **Meilisearch** v1.4 | Búsqueda rápida | 7700 | Master Key: `devmasterkey` |
+
+### Monitoreo y Observabilidad
+
+| Servicio | Descripción | Puerto | UI |
+|---|---|---|---|
+| **Prometheus** | Métricas | 9090 | [localhost:9090](http://localhost:9090) |
+| **Grafana** | Dashboards | 3000 | [localhost:3000](http://localhost:3000) · `admin` / `admin` |
+| **Jaeger** | Trazabilidad | gRPC: 4317 | [localhost:16686](http://localhost:16686) |
+
+### Herramientas de Desarrollo
+
+| Servicio | Descripción | Puertos | UI |
+|---|---|---|---|
+| **Mailpit** | Captura de emails SMTP | SMTP: 1025 | [localhost:8025](http://localhost:8025) |
+| **Keycloak** 22 | IAM / SSO | 8082 | [localhost:8082](http://localhost:8082) · `admin` / `admin` |
+| **Traefik** v2.10 | Reverse Proxy | 80 | [localhost:8083](http://localhost:8083) |
+
+---
+
+## 🔗 Conectar tus Apps
+
+### App corriendo en tu Mac (sin Docker)
+
+Usa `localhost` y el puerto del servicio:
+
+```env
+# .env de tu proyecto NestJS / Next.js / etc.
+DATABASE_URL="postgresql://devuser:devpassword@localhost:5432/devdb"
+REDIS_URL="redis://localhost:6379"
+MONGO_URI="mongodb://devuser:devpassword@localhost:27017/"
+SMTP_HOST="localhost"
+SMTP_PORT=1025
+```
+
+### App dockerizada (en la misma red)
+
+Añade este bloque al final del `docker-compose.yml` de **tu app**:
+
+```yaml
+networks:
+  default:
+    name: infra_dev_network
+    external: true
+```
+
+Luego usa el nombre del servicio como host:
+
+```env
+DATABASE_URL="postgresql://devuser:devpassword@postgres:5432/devdb"
+REDIS_URL="redis://redis:6379"
+MONGO_URI="mongodb://devuser:devpassword@mongodb:27017/"
+SMTP_HOST="mailpit"
+SMTP_PORT=1025
+```
+
+> La CLI (`infra`) tiene una opción "🔗 Conectar mis apps" que muestra este código listo para copiar.
+
+---
+
+## ⚡ Uso Manual con Docker Compose
+
+```bash
+# Iniciar servicios específicos (recomendado)
+docker compose up -d postgres redis mailpit
+
+# Ver estado
+docker compose ps
+
+# Ver logs de un servicio
+docker compose logs -f postgres
+
+# Detener todo
+docker compose down
+```
+
+---
+
+## 💾 Persistencia de Datos
+
+Los datos de cada servicio se guardan localmente en `./data/<servicio>/`. Esta carpeta está en `.gitignore` y **nunca se sube al repositorio**.
+
+```
+data/
+├── postgres/
+├── mysql/
+├── redis/
+├── mongo/
+├── minio/
+└── ...
+```
+
+Para borrar los datos de un servicio y empezar limpio, usa la opción **"💣 Hard Reset"** en la CLI o manualmente:
+
+```bash
+docker compose stop postgres
+docker compose rm -f postgres
+rm -rf ./data/postgres
+docker compose up -d postgres
+```
