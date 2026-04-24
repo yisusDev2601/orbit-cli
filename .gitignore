@@ -1,0 +1,6 @@
+# Data volumes
+/data/
+/minio-data/
+
+# Environment variables
+.env
