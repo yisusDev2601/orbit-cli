@@ -6,12 +6,11 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
+  "keywords": "[\"docker\",\"cli\",\"devtools\",\"infrastructure\",\"developer\",\"orbit\",\"postgresql\",\"redis\",\"mongodb\",\"rabbitmq\",\"kafka\"]",
+  "author": "Jesus Ruiz López",
+  "license": "MIT",
   "type": "module",
   "bin": {
-    "infra": "./index.js",
     "orbit": "./index.js"
   },
   "dependencies": {
@@ -25,5 +24,8 @@
     "open": "^11.0.0",
     "os-utils": "^0.0.14",
     "yaml": "^2.8.3"
-  }
+  },
+  "repository": "{\"type\":\"git\",\"url\":\"https://github.com/your-username/orbit-cli.git\"}",
+  "homepage": "https://github.com/your-username/orbit-cli#readme",
+  "bugs": "{\"url\":\"https://github.com/your-username/orbit-cli/issues\"}"
 }

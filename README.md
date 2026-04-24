@@ -27,7 +27,7 @@
 
 - [Requisitos](#-requisitos)
 - [Instalación](#-instalación)
-- [Herramienta CLI (`infra`)](#-herramienta-cli-infra)
+- [Herramienta CLI (`orbit`)](#-herramienta-cli-orbit)
 - [Servicios Incluidos](#-servicios-incluidos)
 - [Conectar tus Apps](#-conectar-tus-apps)
 - [Uso Manual con Docker Compose](#-uso-manual-con-docker-compose)
@@ -94,8 +94,8 @@ winget install Git.Git
 ### 1. Clonar el repositorio
 
 ```bash
-git clone <url-del-repositorio> infra-dev
-cd infra-dev
+git clone <url-del-repositorio> orbit-infra
+cd orbit-infra
 ```
 
 ### 2. Instalar la CLI
@@ -103,17 +103,17 @@ cd infra-dev
 ```bash
 cd infra-cli
 npm install
-npm link        # Registra el comando global 'infra'
+npm link        # Registra el comando global 'orbit'
 cd ..
 ```
 
 ### 3. Verificar instalación
 
 ```bash
-infra
+orbit
 ```
 
-Si todo está correcto, verás el banner de **INFRA CLI** con el menú principal.
+Si todo está correcto, verás el banner de **ORBIT** con el menú principal.
 
 ---
 
@@ -162,19 +162,19 @@ orbit
 
 ### Reinstalar la CLI
 
-Si el comando `infra` deja de funcionar después de actualizar el repositorio:
+Si el comando `orbit` deja de funcionar después de actualizar el repositorio:
 
 ```bash
-cd infra-cli
+cd infra-cli   # La carpeta se sigue llamando infra-cli internamente
 npm install     # Actualizar dependencias si cambiaron
 npm link        # Volver a registrar el comando global
 ```
 
 ### Notas por sistema operativo
 
-**macOS / Linux**: Funciona de manera nativa. `npm link` crea el symlink en `/usr/local/bin/infra` o `~/.nvm/versions/node/.../bin/infra`.
+**macOS / Linux**: Funciona de manera nativa. `npm link` crea el symlink en `/usr/local/bin/orbit` o `~/.nvm/versions/node/.../bin/orbit`.
 
-**Windows (WSL2)**: Ejecutar todo desde la terminal de WSL2. El comando `infra` quedará disponible dentro del entorno WSL.
+**Windows (WSL2)**: Ejecutar todo desde la terminal de WSL2. El comando `orbit` quedará disponible dentro del entorno WSL.
 
 **Windows (PowerShell / CMD)**: Funcional con limitaciones — los colores ANSI requieren Windows Terminal. Algunas funciones como Port Killer usan `lsof` que no existe en Windows nativo (sí en WSL2).
 
@@ -264,7 +264,7 @@ SMTP_HOST="mailpit"
 SMTP_PORT=1025
 ```
 
-> La CLI (`infra`) tiene una opción "🔗 Conectar mis apps" que muestra este código listo para copiar.
+> La CLI (`orbit`) tiene una opción "🔗 Conectar mis apps" que muestra este código listo para copiar.
 
 ---
 
@@ -308,3 +308,51 @@ docker compose rm -f postgres
 rm -rf ./data/postgres
 docker compose up -d postgres
 ```
+
+---
+
+## 🤝 Contributing
+
+Contributions, issues and feature requests are welcome!
+
+- Read the [Contributing Guide](CONTRIBUTING.md) before submitting a PR.
+- Found a bug? Open an [Issue](../../issues).
+- Have an idea? Start a [Discussion](../../discussions).
+
+```bash
+git clone https://github.com/your-username/orbit-infra.git
+cd orbit-infra/infra-cli
+npm install && npm link
+orbit   # test your changes
+```
+
+---
+
+## 📄 License
+
+Distributed under the **MIT License**. See [LICENSE](LICENSE) for more information.
+
+---
+
+## ✨ Acknowledgements
+
+Built with the following open source tools:
+
+| Library | Purpose |
+|---|---|
+| [@clack/prompts](https://github.com/natemoo-re/clack) | Interactive terminal prompts |
+| [figlet](https://github.com/patorjk/figlet.js) | ASCII art banner |
+| [gradient-string](https://github.com/bokub/gradient-string) | Terminal color gradients |
+| [boxen](https://github.com/sindresorhus/boxen) | Terminal boxes |
+| [chalk](https://github.com/chalk/chalk) | Terminal string styling |
+| [yaml](https://github.com/eemeli/yaml) | Parse docker-compose.yml |
+
+---
+
+<p align="center">
+  <img src="assets/orbit-icon.png" alt="ORBIT" width="48"/>
+  <br/>
+  <strong>ORBIT</strong> &nbsp;·&nbsp; Dev Infrastructure CLI
+  <br/>
+  <sub>Made with ❤️ by <a href="https://github.com/your-username">Jesus Ruiz López</a> &nbsp;·&nbsp; MIT License</sub>
+</p>
